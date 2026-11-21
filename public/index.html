@@ -8,13 +8,18 @@
       name="description"
       content="Your six-subject CIA 2 study workspace: chapter notes, worked questions, custom quizzes, a live coding lab, on-device AI and revision tracking."
     />
-    <title>Study Sprint · CIA 2 Prep</title>
+    <title>Study Sprint · Study planner</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23d05c3b'/%3E%3Cpath d='M12 12h16L17 28h11M12 22h9' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E"
     />
     <link rel="stylesheet" href="/src/client/styles/base.css" />
     <link rel="stylesheet" href="/src/client/styles/workspace.css" />
+    <link rel="stylesheet" href="/src/client/styles/account.css" />
+    <!-- The server replaces this comment with client-safe configuration
+         (project URL and publishable key only). Without it the app runs as a
+         guest and explains that sign-in is unavailable. -->
+    <!--study-sprint-config-->
     <script>
       try {
         document.documentElement.dataset.theme =
@@ -27,11 +32,14 @@
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
-    <div id="app"></div>
+    <div id="app" aria-live="off"></div>
+    <main id="main" class="sr-only" tabindex="-1"></main>
     <dialog id="topicDialog" aria-label="Topic study notes"></dialog>
-    <dialog id="settingsDialog" aria-label="Study settings"></dialog>
+    <dialog id="settingsDialog" aria-label="Study preferences and account"></dialog>
     <dialog id="longDialog" aria-label="Long answer practice"></dialog>
     <dialog id="chapterDialog" aria-label="Chapter study room"></dialog>
+    <dialog id="authDialog" aria-label="Account"></dialog>
+    <dialog id="migrateDialog" aria-label="Import guest progress"></dialog>
     <div id="toast" role="status" aria-live="polite"></div>
   </body>
 </html>
