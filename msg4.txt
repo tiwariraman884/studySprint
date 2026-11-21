@@ -1,0 +1,28 @@
+fix(onboarding): first-visit offer, subject filtering and profile identity
+
+Diagnosed and fixed the defects found by driving the app in a real browser.
+
+- First-visit onboarding never opened: the post-init callback was mangled by an
+  encoding conversion in its own comment, so it threw after setting the offer
+  flag. It is now ASCII-only, wrapped in try/catch, and a render failure can no
+  longer prevent the offer. Returning guests and onboarded students are not
+  asked again in the same session.
+- The dashboard crashed on first load because subject lookups matched the
+  legacy short id after subjects became pack-qualified. getTopic/getSubject now
+  accept both a namespaced key and a bare id, and topicKey resolves either.
+- Subject tiles and their topic counts matched on the legacy id, so every
+  subject stayed visible after deselection. They now match the stable key, so
+  the Subjects page, quizzes, revision, materials and priority view all show
+  only the selected subjects.
+- Onboarding saved the view but not the narrowed selection, so a reload
+  restored all subjects while the plan used the chosen four. It now persists
+  the selection and the finished profile to the workspace, so the sidebar name,
+  initials and heading update immediately instead of after a reload.
+- An onboarded guest is labelled with their own name; only a truly anonymous
+  visitor sees the generic guest label.
+
+Verified in a headless browser end to end: clean storage offers onboarding;
+profile, subject, time and review steps all advance; deselecting two of six
+subjects leaves four, and four are stored and rendered on every page; the
+dashboard, quiz, revision, subjects and materials pages agree; reloading does
+not re-open onboarding; zero console errors.

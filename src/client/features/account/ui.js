@@ -255,7 +255,23 @@ export function register(app) {
       const profile = { ...o.profile, onboardingCompletedAt: new Date().toISOString() };
       app.s.profile = profile;
       app.s.preferences = o.preferences;
-      app.workspace.setSelection({ packId: o.packId, subjectKeys: o.subjectKeys }, { persist: false });
+      // The workspace owns the profile the sidebar and greeting read, so it
+      // must see the finished one before the next render.
+      if (app.workspace) {
+        app.workspace.state.profile = profile;
+        app.workspace.state.preferences = o.preferences;
+      }
+      app.initials = profile.displayName
+        .trim()
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+      // Persist the narrowed selection, not just the rendered view: a reload
+      // must restore exactly the subjects the student chose.
+      app.workspace.setSelection({ packId: o.packId, subjectKeys: o.subjectKeys }, { persist: true });
+      app.s.subjectKeys = o.subjectKeys;
       if (app.workspace.state.mode === "cloud" && app.workspace.remote) {
         await app.workspace.remote.completeOnboarding({ displayName: profile.displayName, subjectKeys: o.subjectKeys });
         await app.workspace.remote.saveProfile({

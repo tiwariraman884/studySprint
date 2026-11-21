@@ -59,16 +59,29 @@ export function createApplication() {
   // starts first so the interface is usable while the account is checked.
   app.render();
   const workspace = createWorkspace(app);
-  workspace.init().then(() => {
-    app.render();
-    if (app.workspace.state.mode === "guest" && !app.s.profile?.onboardingCompletedAt) {
-      // A first visit, or a guest who has not onboarded: offer the short setup
-      // once, but never block studying — the dialog can be dismissed.
-      if (!sessionStorage.getItem("study-sprint:onboarded-offered")) {
-        sessionStorage.setItem("study-sprint:onboarded-offered", "1");
-        app.openOnboarding({ reason: "first-visit" });
+  workspace.init()
+    .then(() => {
+      try {
+        app.render();
+      } catch (error) {
+        // A rendering problem must never block onboarding or studying.
+        console.error("Post-init render failed", error);
       }
-    }
-  });
+      const guest = app.workspace.state.mode === "guest";
+      const onboarded = !!app.s.profile?.onboardingCompletedAt;
+      // Offer the short setup once per session on a first visit. A student
+      // who finished onboarding, or a returning guest in this session, is
+      // not asked again.
+      if (guest && !onboarded && !sessionStorage.getItem("study-sprint:onboarded-offered")) {
+        sessionStorage.setItem("study-sprint:onboarded-offered", "1");
+        try {
+          app.openOnboarding({ reason: "first-visit" });
+        } catch (error) {
+          console.error("Could not open onboarding", error);
+        }
+      }
+    })
+    .catch((error) => console.error("Workspace init failed", error));
   return app;
 }
+

@@ -141,8 +141,10 @@ export function register(app) {
   app.workspaceHeading = function workspaceHeading() {
     const name = app.profile?.displayName || "Student";
     const signedIn = !!app.authState?.user;
-    return signedIn
-      ? `${app.esc(name.toUpperCase())} · YOUR WORKSPACE`
+    const onboarded = !!app.profile?.onboardingCompletedAt;
+    if (signedIn) return `${app.esc(name.toUpperCase())} · YOUR WORKSPACE`;
+    return onboarded
+      ? `${app.esc(name.toUpperCase())} · GUEST, SAVED ON THIS DEVICE`
       : "GUEST WORKSPACE · SAVED ON THIS DEVICE";
   };
 

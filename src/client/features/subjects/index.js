@@ -18,7 +18,7 @@ export function register(app) {
   };
 
   app.subjectOptions = function subjectOptions() {
-    return `<option value="all">All subjects</option>${app.SUBJECTS.map((sub) => `<option value="${sub.id}" ${app.subjectFilter === sub.id ? "selected" : ""}>${sub.name}</option>`).join("")}`;
+    return `<option value="all">All subjects</option>${app.SUBJECTS.map((sub) => `<option value="${sub.key ?? sub.id}" ${app.subjectFilter === (sub.key ?? sub.id) ? "selected" : ""}>${sub.name}</option>`).join("")}`;
   };
 
   app.filters = function filters(withStatus = true) {
@@ -68,8 +68,8 @@ export function register(app) {
     const ts = app.filteredTopics();
     return `${app.header("Your subjects. Every unit in view.", "Choose a subject, filter its units, then work through the topic groups.", "FULL SYLLABUS · PROGRESS CHECKLIST")}<div class="subject-tiles">${app.SUBJECTS.map(
       (sub) => {
-        const st = app.activeTopics().filter((t) => t.subject === sub.id);
-        return `<button class="subject-tile ${app.subjectFilter === sub.id ? "selected" : ""}" data-action="subject" data-id="${sub.id}">${app.subjectIcon(sub.id)}<strong>${sub.name}</strong><span>${app.CURRICULUM.find((c) => c.id === sub.id).code}</span><div class="progress"><i style="width:${app.fraction(st)}%"></i></div><small>${st.filter((t) => app.status(t.id) === "done").length}/${st.length} topics</small></button>`;
+        const st = app.activeTopics().filter((t) => t.subject === sub.key);
+        return `<button class="subject-tile ${app.subjectFilter === sub.key ? "selected" : ""}" data-action="subject" data-id="${sub.key}">${app.subjectIcon(sub.key)}<strong>${sub.name}</strong><span>${app.CURRICULUM.find((c) => c.id === sub.key).code}</span><div class="progress"><i style="width:${app.fraction(st)}%"></i></div><small>${st.filter((t) => app.status(t.id) === "done").length}/${st.length} topics</small></button>`;
       },
     ).join(
       "",
