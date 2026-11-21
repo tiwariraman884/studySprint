@@ -1,0 +1,51 @@
+export const LAB_TEMPLATES = [
+  {
+    id: "py-gcd",
+    language: "python",
+    name: "GCD & LCM · exercise 10",
+    stdin: "12\n18",
+    code: 'import math\n\na = int(input())\nb = int(input())\ng = math.gcd(a, b)\nlcm = 0 if a == 0 or b == 0 else abs(a * b) // g\nprint("GCD:", g)\nprint("LCM:", lcm)',
+  },
+  {
+    id: "py-frequency",
+    language: "python",
+    name: "Character frequency · exercise 5",
+    stdin: "hello",
+    code: "from collections import Counter\n\ntext = input()\nfor char, count in sorted(Counter(text).items()):\n    print(repr(char), count)",
+  },
+  {
+    id: "py-files",
+    language: "python",
+    name: "Files & counts · exercise 7",
+    stdin: "",
+    code: 'text = "Hi all\\nBye"\nwith open("notes.txt", "w", encoding="utf-8") as f:\n    f.write(text)\nwith open("notes.txt", encoding="utf-8") as f:\n    content = f.read()\nprint("Characters:", len(content))\nprint("Words:", len(content.split()))\nprint("Lines:", len(content.splitlines()))\n# Files here are temporary and reset on the next run.',
+  },
+  {
+    id: "py-bug",
+    language: "python",
+    name: "Debug challenge · off-by-one",
+    stdin: "",
+    code: "# Goal: print every list element. Find the bug.\nvalues = [10, 20, 30]\nfor i in range(len(values) + 1):\n    print(values[i])",
+  },
+  {
+    id: "cpp-template",
+    language: "cpp",
+    name: "Generic function · OOP unit 4",
+    stdin: "",
+    code: '#include <iostream>\n\ntemplate <typename T>\nT larger(T a, T b) {\n    return a > b ? a : b;\n}\n\nint main() {\n    std::cout << larger(4, 9) << "\\n";\n    std::cout << larger(2.5, 1.8) << "\\n";\n}',
+  },
+  {
+    id: "cpp-exception",
+    language: "cpp",
+    name: "Exception handling · OOP unit 4",
+    stdin: "0",
+    code: '#include <iostream>\n#include <stdexcept>\n\nint main() {\n    int denominator;\n    std::cin >> denominator;\n    try {\n        if (denominator == 0)\n            throw std::invalid_argument("Denominator is zero");\n        std::cout << 10.0 / denominator << "\\n";\n    } catch (const std::exception& error) {\n        std::cerr << error.what() << "\\n";\n    }\n}',
+  },
+  {
+    id: "js-search",
+    language: "javascript",
+    name: "Binary search · DSA",
+    stdin: "",
+    code: "function binarySearch(a, target) {\n  let low = 0, high = a.length - 1;\n  while (low <= high) {\n    const mid = Math.floor((low + high) / 2);\n    if (a[mid] === target) return mid;\n    if (a[mid] < target) low = mid + 1;\n    else high = mid - 1;\n  }\n  return -1;\n}\nconsole.log(binarySearch([2, 4, 6, 8, 10], 8));",
+  },
+];
