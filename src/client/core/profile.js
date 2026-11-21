@@ -19,6 +19,12 @@ export const DEFAULT_PROFILE = Object.freeze({
   semester: null,
   explanationLanguage: "en",
   onboardingCompletedAt: null,
+  collegeId: "",
+  admissionBatch: "",
+  academicSemester: null,
+  firstYearGroup: "A",
+  bridgeCourses: false,
+  confirmedAlternatives: {},
 });
 
 export const DEFAULT_PREFERENCES = Object.freeze({
@@ -44,6 +50,12 @@ export function normalizeProfile(raw = {}) {
     semester: Number.isInteger(semester) && semester >= 1 && semester <= 12 ? semester : null,
     explanationLanguage: raw.explanationLanguage === "hi-en" ? "hi-en" : "en",
     onboardingCompletedAt: raw.onboardingCompletedAt || null,
+    collegeId: cleanText(raw.collegeId, 64),
+    admissionBatch: cleanText(raw.admissionBatch, 20),
+    academicSemester: Number.isInteger(Number(raw.academicSemester)) && Number(raw.academicSemester) >= 1 && Number(raw.academicSemester) <= 4 ? Number(raw.academicSemester) : null,
+    firstYearGroup: raw.firstYearGroup === "B" ? "B" : "A",
+    bridgeCourses: raw.bridgeCourses === true,
+    confirmedAlternatives: raw.confirmedAlternatives && typeof raw.confirmedAlternatives === "object" ? raw.confirmedAlternatives : {},
   };
 }
 

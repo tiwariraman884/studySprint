@@ -16,7 +16,9 @@ export function selectedSubjectList(pack, selectedKeys) {
   const selected = new Set(selectedKeys || []);
   return packSubjects(pack)
     .filter((s) => selected.has(s.subject.key))
-    .map((s) => s.subject);
+    // Topic records carry the pack-qualified subject key, so the subject list
+    // must use the same id. rawId keeps the short authored id for content rules.
+    .map((s) => ({ ...s.subject, id: s.subject.key }));
 }
 
 /** All topic objects in the selected subjects. */

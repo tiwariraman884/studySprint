@@ -14,12 +14,13 @@ import {
 } from "../../../content/curriculum/index.js";
 
 export function register(app) {
-  // Current active academic selection in the UI
-  app.activeBranchId = app.activeBranchId || "branch-06"; // Default: CSE
-  app.activeSemester = app.activeSemester || 3;
-  app.activeFirstYearGroup = app.activeFirstYearGroup || "A";
-  app.activeBridgeCourses = app.activeBridgeCourses || false;
-  app.studyMapTab = app.studyMapTab || "map"; // "map" or "matrix"
+  // Current active academic selection in the UI. Defaults come from the saved
+  // academic context (see src/client/core/academic.js).
+  app.activeBranchId = app.academic?.branchId || app.activeBranchId || "branch-06"; // Default: CSE
+  app.activeSemester = app.academic?.semester || app.activeSemester || 3;
+  app.activeFirstYearGroup = app.academic?.firstYearGroup || app.activeFirstYearGroup || "A";
+  app.activeBridgeCourses = app.activeBridgeCourses ?? app.activeBridgeCourse ?? false;
+  app.studyMapTab = app.studyMapTab || app.studymapTab || "map"; // "map" or "matrix"
 
   app.renderStudyMap = function renderStudyMap() {
     if (app.studyMapTab === "matrix") {

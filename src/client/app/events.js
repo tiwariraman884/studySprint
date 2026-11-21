@@ -249,7 +249,32 @@ export function registerEvents(app) {
     }
   });
   document.addEventListener("change", async (e) => {
-    if (e.target.id === "subjectFilter") {
+    const t = e.target;
+    if (t.dataset.action === "studymap-branch") {
+      app.s.academic.branchId = t.value;
+      app.academic = app.s.academic;
+      app.activeBranchId = t.value;
+      app.save();
+      app.render();
+      return;
+    }
+    if (t.dataset.action === "studymap-semester") {
+      app.s.academic.semester = +t.value;
+      app.academic = app.s.academic;
+      app.activeSemester = +t.value;
+      app.save();
+      app.render();
+      return;
+    }
+    if (t.dataset.action === "studymap-group") {
+      app.s.academic.firstYearGroup = t.value;
+      app.academic = app.s.academic;
+      app.activeFirstYearGroup = t.value;
+      app.save();
+      app.render();
+      return;
+    }
+    if (t.id === "subjectFilter") {
       app.subjectFilter = e.target.value;
       app.render();
     }
@@ -299,7 +324,8 @@ export function registerEvents(app) {
     const authForm = e.target.closest("[data-auth-form]");
     const onboarding = e.target.closest("[data-onboarding-form]");
     const profile = e.target.closest("[data-profile-form]");
-    if (!authForm && !onboarding && !profile) return;
+    const academic = e.target.closest("[data-academic-form]");
+    if (!authForm && !onboarding && !profile && !academic) return;
     e.preventDefault();
     if (authForm) {
       if (app.authBusy) return;
@@ -307,6 +333,10 @@ export function registerEvents(app) {
       if (authForm.dataset.authForm === "signup") app.submitAuth("signup", data);
       else if (authForm.dataset.authForm === "reset") app.submitAuth("reset", data);
       else app.submitAuth("signin", data);
+      return;
+    }
+    if (academic) {
+      app.saveAcademicProfile();
       return;
     }
     if (onboarding) {
@@ -431,23 +461,20 @@ export function registerEvents(app) {
     } else if (a === "practice-tab") {
       app.practiceTab = el.dataset.tab;
       app.render();
-    } else if (a === "studymap-branch") {
-      app.activeBranchId = el.dataset.id;
-      app.render();
-    } else if (a === "studymap-semester") {
-      app.activeSemester = +el.dataset.sem;
-      app.render();
-    } else if (a === "studymap-group") {
-      app.activeFirstYearGroup = el.dataset.group;
-      app.render();
     } else if (a === "studymap-tab") {
-      app.studymapTab = el.dataset.tab;
+      app.studyMapTab = el.dataset.tab;
       app.render();
     } else if (a === "studymap-bridge") {
-      app.activeBridgeCourse = !app.activeBridgeCourse;
+      app.activeBridgeCourses = !app.activeBridgeCourses;
+      app.s.academic.bridgeCourses = app.activeBridgeCourses;
+      app.save();
       app.render();
     } else if (a === "curriculum-matrix") {
       app.navigate("curriculum");
+    } else if (a === "studymap-apply-subjects") {
+      app.applyAcademicSubjects();
+    } else if (a === "academic-save") {
+      app.saveAcademicProfile();
     }
   });
   document.addEventListener("input", (e) => {
@@ -586,6 +613,18 @@ export function registerEvents(app) {
       app.render();
     } else if (a === "lab-run") app.runLab();
     else if (a === "lab-stop") app.stopLab();
+    else if (a === "lab-mode") {
+      app.labMode = el.dataset.mode;
+      app.render();
+      app.toast(`Lab mode: ${app.labMode}.`);
+    } else if (a === "lab-subview") {
+      app.labSubView = el.dataset.subview;
+      app.render();
+    } else if (a === "lab-test") app.testLab();
+    else if (a === "lab-submit") app.submitLab();
+    else if (a === "lab-record-download") app.downloadLabRecord();
+    else if (a === "lab-apply-diff") app.applyLabDiff();
+    else if (a === "lab-revert-diff") app.revertLabDiff();
     else if (a === "lab-clear") {
       app.labOut = "";
       app.labErr = "";
