@@ -11,10 +11,19 @@ export function initializeState(app) {
           "'": "&#39;",
         })[c],
     );
+  // The storage key is unchanged so existing progress is found and upgraded in
+  // place by src/client/core/migration.js. The legacy name is kept for
+  // compatibility; it is not a user-facing identity.
   app.KEY = "raman-cia2-sprint-v1";
+  // Library defaults only: onboarding and the workspace controller replace the
+  // start date and preferences with the student's own local values.
   app.defaults = {
-    version: 1,
-    start: "2026-11-14",
+    version: 2,
+    start: "",
+    packId: null,
+    subjectKeys: null,
+    profile: null,
+    preferences: null,
     status: {},
     reviews: {},
     completedAt: {},
@@ -110,9 +119,12 @@ export function initializeState(app) {
   app.syllabusSubject = "de";
   app.activeLong = null;
   app.s.scope = app.s.scope || "exam";
+  // Dates use the student's local calendar day; an empty start is filled from
+  // their own clock, never from a fixed exam date.
+  if (!app.s.start) app.s.start = app.todayISO();
   app.s.planPrefs = app.s.planPrefs || {
-    days: 4,
-    hours: 7,
+    days: 7,
+    hours: 4,
     start: app.s.start,
     scope: "exam",
     subjects: app.SUBJECTS.map((x) => x.id),
@@ -142,6 +154,9 @@ export function initializeState(app) {
   app.s.lab.drafts ||= {};
   app.s.lab.inputs ||= {};
   app.practiceMode = "all";
+  app.practiceTab = "short";
+  app.studymapTab = "map";
+  app.activeBridgeCourse = false;
   app.quizUnit = "all";
   app.materialSubject = "all";
   app.materialUnit = null;
@@ -163,7 +178,11 @@ export function initializeState(app) {
   app.aiJob = null;
   app.aiTimer = null;
   app.NAV = [
-    ["overview", "grid", "Overview"],
+    ["overview", "grid", "Today"],
+    ["studymap", "book", "Study Map"],
+    ["practice", "question", "Practice"],
+    ["lab", "code", "Smart Lab"],
+    ["revision", "revision", "Revision"],
     ["plan", "calendar", "Study plan"],
     ["subjects", "book", "My subjects"],
     ["materials", "layers", "Study materials"],
@@ -171,9 +190,8 @@ export function initializeState(app) {
     ["questions", "question", "Short questions"],
     ["long", "code", "Long answers"],
     ["quiz", "quiz", "Practice quizzes"],
-    ["lab", "code", "Smart lab"],
+    ["curriculum", "layers", "Coverage matrix"],
     ["assistant", "spark", "Study assistant"],
-    ["revision", "revision", "Revision room"],
     ["priority", "flag", "Priority view"],
   ];
   app.chapterLabel = (sub, n) =>

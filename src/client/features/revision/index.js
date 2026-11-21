@@ -63,7 +63,7 @@ export function register(app) {
     return html
       .replace(
         "15 selected essentials plus any weak topics.",
-        "Selected essentials across all six subjects, plus any weak topics.",
+        "Selected essentials across your chosen subjects, plus any weak topics.",
       )
       .replace("60-minute rescue pass", "75-minute rescue pass")
       .replace("10 min Algebra", "10 min Discrete")

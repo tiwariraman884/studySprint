@@ -44,7 +44,13 @@ export function registerEvents(app) {
       app.setStatus(id, el.dataset.status);
       app.toast(`Marked ${app.statusName(el.dataset.status).toLowerCase()}.`);
     } else if (a === "reviewed") {
-      app.s.reviews[app.topicKey(id)] = Date.now();
+      const key = app.topicKey(id);
+      app.s.reviews[key] = Date.now();
+      app.persistWrite?.("revision", {
+        key,
+        at: app.s.reviews[key],
+        confidence: app.s.confidence?.[key] ?? null,
+      });
       app.save();
       app.render();
       app.toast(
@@ -152,11 +158,25 @@ export function registerEvents(app) {
         q.checked = false;
       } else {
         q.complete = true;
+        const attemptId =
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `attempt-${Date.now()}`;
+        const score = q.answers.filter((x) => x.correct).length;
         app.s.history.unshift({
+          id: attemptId,
           at: Date.now(),
           subject: app.getSubject(q.subject)?.name || "Mixed subjects",
-          score: q.answers.filter((x) => x.correct).length,
+          subjectId: q.subject,
+          score,
           total: q.ids.length,
+        });
+        app.persistWrite?.("attempt", {
+          id: attemptId,
+          subjectKey: q.subject === "all" ? null : q.subject,
+          score,
+          total: q.ids.length,
+          at: Date.now(),
         });
         app.s.history = app.s.history.slice(0, 20);
       }
@@ -181,6 +201,41 @@ export function registerEvents(app) {
       app.exportProgress();
     } else if (a === "import") {
       document.getElementById("importFile").click();
+    } else if (a === "settings-tab") {
+      app.settingsTab = el.dataset.tab || "preferences";
+      app.openSettings(app.settingsTab);
+    } else if (a === "auth-open") {
+      app.openAuth(el.dataset.mode || "signin");
+    } else if (a === "auth-mode") {
+      app.openAuth(el.dataset.mode || "signin");
+    } else if (a === "close-auth") {
+      document.getElementById("authDialog").close();
+    } else if (a === "auth-guest") {
+      document.getElementById("authDialog").close();
+      app.toast("You’re in guest mode. Progress stays on this device until you sign in.");
+    } else if (a === "auth-signout") {
+      app.authSignOut();
+    } else if (a === "auth-resend") {
+      app.authResend();
+    } else if (a === "onboarding-guest") {
+      if (app.workspace?.state.mode === "guest") {
+        document.getElementById("authDialog").close();
+        app.onboarding = null;
+      }
+    } else if (a === "onboarding-back") {
+      app.onboardingBack();
+    } else if (a === "onboarding-finish") {
+      app.onboardingFinish();
+    } else if (a === "import-open") {
+      app.openImport();
+    } else if (a === "close-import") {
+      document.getElementById("migrateDialog").close();
+    } else if (a === "confirm-import") {
+      app.confirmImport();
+    } else if (a === "conflict-keep") {
+      app.resolveConflict(el.dataset.choice);
+    } else if (a === "sync-retry") {
+      app.workspace?.flush().then(() => app.toast("Retried queued changes."));
     }
   });
   document.addEventListener("input", (e) => {
@@ -237,6 +292,30 @@ export function registerEvents(app) {
       app.navigate("subjects");
       document.getElementById("topicSearch")?.focus();
     }
+  });
+  // Account, onboarding and profile forms. Each one has a visible error slot;
+  // nothing here relies on a toast alone for validation.
+  document.addEventListener("submit", (e) => {
+    const authForm = e.target.closest("[data-auth-form]");
+    const onboarding = e.target.closest("[data-onboarding-form]");
+    const profile = e.target.closest("[data-profile-form]");
+    if (!authForm && !onboarding && !profile) return;
+    e.preventDefault();
+    if (authForm) {
+      if (app.authBusy) return;
+      const data = new FormData(authForm);
+      if (authForm.dataset.authForm === "signup") app.submitAuth("signup", data);
+      else if (authForm.dataset.authForm === "reset") app.submitAuth("reset", data);
+      else app.submitAuth("signin", data);
+      return;
+    }
+    if (onboarding) {
+      // The stepper's current step is the authoritative one for the form.
+      const step = Number(document.querySelector(".stepper .step.current .step-number")?.textContent || 1);
+      app.onboardingNext(onboarding, step);
+      return;
+    }
+    if (profile) app.saveProfileForm(profile, profile.dataset.profileForm);
   });
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -344,9 +423,31 @@ export function registerEvents(app) {
       document.getElementById("settingsDialog").close();
       app.render();
       app.toast("Preferences saved.");
+    } else if (a === "save-academic-profile") {
+      app.saveAcademicProfile();
     } else if (a === "settings-plan") {
       document.getElementById("settingsDialog").close();
       app.navigate("plan");
+    } else if (a === "practice-tab") {
+      app.practiceTab = el.dataset.tab;
+      app.render();
+    } else if (a === "studymap-branch") {
+      app.activeBranchId = el.dataset.id;
+      app.render();
+    } else if (a === "studymap-semester") {
+      app.activeSemester = +el.dataset.sem;
+      app.render();
+    } else if (a === "studymap-group") {
+      app.activeFirstYearGroup = el.dataset.group;
+      app.render();
+    } else if (a === "studymap-tab") {
+      app.studymapTab = el.dataset.tab;
+      app.render();
+    } else if (a === "studymap-bridge") {
+      app.activeBridgeCourse = !app.activeBridgeCourse;
+      app.render();
+    } else if (a === "curriculum-matrix") {
+      app.navigate("curriculum");
     }
   });
   document.addEventListener("input", (e) => {
@@ -608,3 +709,4 @@ export function registerEvents(app) {
     );
   });
 }
+

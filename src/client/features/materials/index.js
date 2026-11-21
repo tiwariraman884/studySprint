@@ -4,7 +4,7 @@ export function register(app) {
     const selected = app.CURRICULUM.filter(
       (c) => app.materialSubject === "all" || c.id === app.materialSubject,
     );
-    return `${app.header("Your chapter study room.", "Read the idea. Work an example. Close the notes and explain it back.", "NOTES + WORKED ANSWERS + PRIMARY READING")}<div class="toolbar"><select id="materialSubject" aria-label="Study material subject"><option value="all">All six subjects</option>${app.SUBJECTS.map((x) => `<option value="${x.id}" ${app.materialSubject === x.id ? "selected" : ""}>${x.name}</option>`).join("")}</select><span class="small muted">All 36 chapters / exercises · independent of the focus filter</span></div>${selected
+    return `${app.header("Your chapter study room.", "Read the idea. Work an example. Close the notes and explain it back.", "NOTES + WORKED ANSWERS + PRIMARY READING")}<div class="toolbar"><select id="materialSubject" aria-label="Study material subject"><option value="all">All selected subjects</option>${app.SUBJECTS.map((x) => `<option value="${x.id}" ${app.materialSubject === x.id ? "selected" : ""}>${x.name}</option>`).join("")}</select><span class="small muted">chapters / exercises in your selection · independent of the focus filter</span></div>${selected
       .map(
         (c) =>
           `<section class="material-section"><div class="section-head"><div><h2>${c.name}</h2><p class="sub">${c.code} · ${c.units.length} ${c.id === "py" ? "exercises" : "chapters"}</p></div>${app.subjectIcon(c.id)}</div><div class="chapter-grid">${c.units
@@ -18,7 +18,7 @@ export function register(app) {
                     q.unit === u.number &&
                     q.kind === "long",
                 );
-              return `<article class="card chapter-card"><div class="between"><span class="label">${app.chapterLabel(c.id, u.number)}</span><span class="tag ${app.EXAM_UNITS[c.id].includes(u.number) ? "done" : "medium"}">${app.EXAM_UNITS[c.id].includes(u.number) ? "CIA 2 FOCUS" : "FULL SYLLABUS"}</span></div><h3>${app.esc(ts[0]?.unitName || app.chapterLabel(c.id, u.number))}</h3><p>${app.esc(u.text.slice(0, 230))}${u.text.length > 230 ? "…" : ""}</p><div class="chapter-meta">${ts.length} topic guides · 2 new practice questions · 2 new MCQs</div><div class="flex"><button class="outline-btn" data-action="chapter-open" data-id="${c.id}" data-unit="${u.number}">Study chapter ${app.icon("arrow")}</button><button class="text-btn" data-action="chapter-quiz" data-id="${c.id}" data-unit="${u.number}">Quiz</button></div></article>`;
+              return `<article class="card chapter-card"><div class="between"><span class="label">${app.chapterLabel(c.id, u.number)}</span><span class="tag ${(app.EXAM_UNITS[c.id] || []).includes(u.number) ? "done" : "medium"}">${app.EXAM_UNITS[c.id].includes(u.number) ? "EXAM FOCUS" : "FULL SYLLABUS"}</span></div><h3>${app.esc(ts[0]?.unitName || app.chapterLabel(c.id, u.number))}</h3><p>${app.esc(u.text.slice(0, 230))}${u.text.length > 230 ? "…" : ""}</p><div class="chapter-meta">${ts.length} topic guides · 2 new practice questions · 2 new MCQs</div><div class="flex"><button class="outline-btn" data-action="chapter-open" data-id="${c.id}" data-unit="${u.number}">Study chapter ${app.icon("arrow")}</button><button class="text-btn" data-action="chapter-quiz" data-id="${c.id}" data-unit="${u.number}">Quiz</button></div></article>`;
             })
             .join(
               "",

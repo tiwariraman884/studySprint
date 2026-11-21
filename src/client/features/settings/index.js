@@ -1,20 +1,12 @@
 // Feature methods use the shared application context; no browser globals are added.
 export function register(app) {
-  app.openSettings = function openSettings() {
-    const d = document.getElementById("settingsDialog");
-    d.innerHTML = `<div class="dialog-head"><div><span class="label">MAKE IT YOURS</span><h2>Preferences & backups</h2></div><button class="icon-btn" data-action="close-settings" aria-label="Close settings">${app.icon("close")}</button></div><div class="dialog-body"><div class="field"><label class="flex"><input id="hinglishToggle" type="checkbox" ${app.s.hinglish ? "checked" : ""} style="width:auto"> Show simple Hinglish explanations</label></div><div class="banner">${app.icon("shield")}<div>Progress, long-answer drafts, quiz history and your custom plan are saved in this browser. Use export/import to move them to another device. No automatic cross-device sync.</div></div><div class="flex" style="flex-wrap:wrap"><button class="outline-btn" data-action="export">${app.icon("download")}Export progress</button><button class="outline-btn" data-action="import">${app.icon("upload")}Import backup</button><input type="file" id="importFile" accept="application/json" hidden></div><p class="small muted" style="margin-top:15px">Import replaces this browser’s progress with the selected backup. A previous-version backup is supported.</p><button class="text-btn" style="margin-top:20px" data-action="settings-plan">Change plan dates, days & hours ${app.icon("arrow")}</button></div><div class="dialog-actions"><button class="primary-btn" data-action="save-preferences">Save preferences</button></div>`;
-    d.showModal();
-  };
+  // Backups and preferences keep the same shape as before. The settings dialog
+  // itself is built by the account feature (preferences, profile, subjects and
+  // account tabs), so there is a single settings surface.
 
   app.exportProgress = function exportProgress() {
     const blob = new Blob(
-      [
-        JSON.stringify(
-          { ...app.s, exportedAt: new Date().toISOString() },
-          null,
-          2,
-        ),
-      ],
+      [JSON.stringify({ ...app.s, exportedAt: new Date().toISOString() }, null, 2)],
       { type: "application/json" },
     );
     const url = URL.createObjectURL(blob);
@@ -47,9 +39,7 @@ export function register(app) {
     clean.start = raw.start;
     clean.hinglish = raw.hinglish !== false;
     for (const t of app.TOPICS) {
-      if (
-        ["not-started", "learning", "done", "weak"].includes(raw.status[t.id])
-      )
+      if (["not-started", "learning", "done", "weak"].includes(raw.status[t.id]))
         clean.status[t.id] = raw.status[t.id];
       if (Number.isFinite(raw.completedAt?.[t.id]) && raw.completedAt[t.id] > 0)
         clean.completedAt[t.id] = raw.completedAt[t.id];
@@ -86,6 +76,8 @@ export function register(app) {
           .slice(0, 20)
       : [];
     if (app.getTopic(raw.lastTopic)) clean.lastTopic = raw.lastTopic;
+    // Preserve academic profile across backup restore.
+    if (raw.academic && typeof raw.academic === "object") clean.academic = raw.academic;
     return clean;
   };
 

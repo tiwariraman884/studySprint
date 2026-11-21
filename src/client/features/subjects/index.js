@@ -66,7 +66,7 @@ export function register(app) {
 
   app.renderSubjects = function renderSubjects() {
     const ts = app.filteredTopics();
-    return `${app.header("Six subjects. Every unit in view.", "Choose a subject, filter its units, then work through the topic groups.", "FULL SYLLABUS · PROGRESS CHECKLIST")}<div class="subject-tiles">${app.SUBJECTS.map(
+    return `${app.header("Your subjects. Every unit in view.", "Choose a subject, filter its units, then work through the topic groups.", "FULL SYLLABUS · PROGRESS CHECKLIST")}<div class="subject-tiles">${app.SUBJECTS.map(
       (sub) => {
         const st = app.activeTopics().filter((t) => t.subject === sub.id);
         return `<button class="subject-tile ${app.subjectFilter === sub.id ? "selected" : ""}" data-action="subject" data-id="${sub.id}">${app.subjectIcon(sub.id)}<strong>${sub.name}</strong><span>${app.CURRICULUM.find((c) => c.id === sub.id).code}</span><div class="progress"><i style="width:${app.fraction(st)}%"></i></div><small>${st.filter((t) => app.status(t.id) === "done").length}/${st.length} topics</small></button>`;
@@ -84,8 +84,17 @@ export function register(app) {
   };
 
   app.setStatus = function setStatus(id, value) {
+    id = app.topicKey(id);
     app.s.status[id] = value;
     if (value === "done") app.s.completedAt[id] = Date.now();
+    // Report the write so a signed-in student's account keeps the same record.
+    app.persistWrite?.("progress", {
+      key: id,
+      status: value,
+      completedAt: app.s.completedAt[id] || null,
+      notes: app.s.notesSummary?.[id] || "",
+      excluded: !!app.s.excluded?.[id],
+    });
     app.save();
     app.render();
     if (document.getElementById("topicDialog").open && app.activeTopic === id) {
@@ -102,7 +111,7 @@ export function register(app) {
 
   app.renderSyllabus = function renderSyllabus() {
     const c = app.CURRICULUM.find((c) => c.id === app.syllabusSubject);
-    return `${app.header("The syllabus. Straight from your PDF.", "All five theory subjects and CSP-005, organised without hiding the remaining units.", "25 THEORY UNITS · 11 LAB EXERCISES")}<div class="banner">${app.icon("info")}<div><strong>CIA 2 focus is a study filter, not a confirmed current exam boundary.</strong><p>The uploaded 2025–26 papers emphasize Units 4–5 for DE/OOP/DSA, Modules 4–5 for UHV and Units 3 & 5 for Discrete. Algebraic Structures (Unit 4) remains included because you previously shared it. Python includes all exercises. Full syllabus shows everything.</p></div></div><div class="toolbar">${app.SUBJECTS.map((sub) => `<button class="filter-chip ${sub.id === app.syllabusSubject ? "active" : ""}" data-action="syllabus-subject" data-id="${sub.id}">${sub.short}</button>`).join("")}</div><section class="card"><div class="between"><div><h2>${c.name}</h2><p class="small muted" style="margin-top:5px">${c.code} · syllabus PDF pages ${c.pdfPages.join(", ")} (printed ${c.printedPages.join(", ")})</p></div>${app.subjectIcon(c.id)}</div><p class="small muted" style="margin-top:15px">Extracted from your uploaded university syllabus. Line wrapping is normalised. Original wording/typos are retained here; study notes clarify “sunmonoid” as submonoid.</p></section><div class="stack" style="margin-top:18px">${c.units
+    return `${app.header("The syllabus. As authored in your course pack.", "Every unit of the subjects you selected, organised without hiding the remaining ones.", "SELECTED SYLLABUS · ALL UNITS")}<div class="banner">${app.icon("info")}<div><strong>CIA 2 focus is a study filter, not a confirmed current exam boundary.</strong><p>The uploaded 2025–26 papers emphasize Units 4–5 for DE/OOP/DSA, Modules 4–5 for UHV and Units 3 & 5 for Discrete. Algebraic Structures (Unit 4) remains included because you previously shared it. Python includes all exercises. Full syllabus shows everything.</p></div></div><div class="toolbar">${app.SUBJECTS.map((sub) => `<button class="filter-chip ${sub.id === app.syllabusSubject ? "active" : ""}" data-action="syllabus-subject" data-id="${sub.id}">${sub.short}</button>`).join("")}</div><section class="card"><div class="between"><div><h2>${c.name}</h2><p class="small muted" style="margin-top:5px">${c.code} · syllabus PDF pages ${c.pdfPages.join(", ")} (printed ${c.printedPages.join(", ")})</p></div>${app.subjectIcon(c.id)}</div><p class="small muted" style="margin-top:15px">Extracted from your uploaded university syllabus. Line wrapping is normalised. Original wording/typos are retained here; study notes clarify “sunmonoid” as submonoid.</p></section><div class="stack" style="margin-top:18px">${c.units
       .map((u) => {
         const ts = app.TOPICS.filter(
           (t) => t.subject === c.id && t.unit === u.number,
