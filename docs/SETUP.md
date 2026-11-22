@@ -29,7 +29,7 @@ leave the server.
 
 | Environment | Where | Notes |
 | --- | --- | --- |
-| Local development | A file named `.env.local` in the repository root, or shell variables before `npm run dev` | `.env.local` is git-ignored. There is no dotenv loader: export the variables in your shell, or use the PowerShell block below |
+| Local development | A file named `.env.local` in the repository root, or shell variables before `npm run dev` | `.env.local` is git-ignored and read by the dev server at startup. A real environment variable always wins over the file, so CI and hosting are unaffected |
 | CI | Repository Settings → Secrets and variables → Actions | Only the public two are ever needed in CI; the database job starts its own PostgreSQL |
 | Hosted deployment | Your host's environment-variable settings (for example a Cloudflare Worker secret/variable) | Variables are read per request, so a redeploy is not needed after changing a value |
 
@@ -80,6 +80,23 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 The migrations are idempotent enough to re-run on a fresh database; the seed is
 endlessly idempotent (it checks the content hash).
+
+## Auth behaviour of a fresh Supabase project
+
+A newly created project has an email sign-up rate limit on its built-in sender
+(roughly a handful of messages per hour) and rejects reserved domains such as
+`example.com` with `email_address_invalid`. Both are reported honestly in the
+account panel:
+
+- **Email rate limited** — the project answered HTTP 429. Wait for the window to
+  pass, or configure SMTP (see [Authentication](AUTHENTICATION.md)), which removes
+  the built-in limit.
+- **Address rejected** — use a real, deliverable mailbox.
+
+To test a whole sign-up flow repeatedly while the built-in sender is limited,
+either configure SMTP, or temporarily turn off "Confirm email" in
+Authentication → Providers → Email (then the account is usable immediately and
+no message is sent; turn it back on before inviting real students).
 
 ## 4. Seed the course pack
 

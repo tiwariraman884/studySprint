@@ -37,8 +37,8 @@ export function escapeAttr(value) {
 function statusBanner(ctx) {
   const auth = ctx.authState;
   if (auth.status === "unavailable" || auth.status === "error") {
-    return `<div class="banner warn" role="status"><strong>Sign-in is unavailable on this deployment.</strong>
-      <p>${escapeAttr(auth.reason || "Cloud accounts are not configured.")} Everything under “Continue as guest” still works.</p></div>`;
+    return `<div class="banner warn" role="status" data-auth-detail="${escapeAttr(auth.detail || "")}"><strong>Sign-in is unavailable on this deployment.</strong>
+      <p>${escapeAttr(auth.reason || "Cloud accounts are not configured.")} ${escapeAttr(auth.detail || "")} Everything under “Continue as guest” still works.</p></div>`;
   }
   return "";
 }
@@ -270,7 +270,8 @@ export function renderAccountSettings(ctx) {
            </div>`
       : `<p class="small muted">You are studying as a guest (${escapeAttr(profile?.displayName || "Student")}). Progress is saved in this browser only.</p>
            <div class="flex" style="flex-wrap:wrap">
-             <button class="primary-btn" data-action="auth-open" data-mode="signin">Sign in or create an account</button>
+             <button class="primary-btn" data-action="auth-open" data-mode="signin">Sign in</button>
+             <button class="outline-btn" data-action="auth-open" data-mode="signup">Create an account</button>
              <button class="outline-btn" data-action="import-open">Import guest progress</button>
            </div>`}
     </section>`;

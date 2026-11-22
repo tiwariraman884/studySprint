@@ -4,6 +4,7 @@ import path from "node:path";
 import { root, collectAssets } from "./assets.mjs";
 import { createWorker } from "../src/server/app.js";
 import { validateEnvironment, clientAuthConfig } from "../src/server/env.js";
+import { loadEnvFile } from "./env-file.mjs";
 const arg = (key, fallback) => {
   const i = process.argv.indexOf(key);
   return i >= 0 ? process.argv[i + 1] : fallback;
@@ -14,6 +15,8 @@ if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw Error("PORT must be between 1 and 65535.");
 // Server configuration comes from the environment (see .env.example). Only the
 // publishable values are injected into pages; server-only values stay here.
+// Local values from .env.local (git-ignored). Real environment variables win.
+const fromFile = loadEnvFile(root);
 const serverEnv = { ...process.env, SITE_URL: process.env.SITE_URL || `http://${host}:${port}` };
 const envCheck = validateEnvironment(serverEnv);
 if (!envCheck.ok) throw Error(envCheck.error);

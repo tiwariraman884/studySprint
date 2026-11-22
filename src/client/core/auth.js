@@ -8,12 +8,17 @@
 // When the SDK or the configuration is unavailable, the controller stays in a
 // clearly-labelled "unavailable" state and guest mode keeps working.
 
-export const SDK_VERSION = "2.58.0";
-export const SDK_URL = `https://cdn.jsdelivr.net/npm/@supabase/supabase-js@${SDK_VERSION}/+esm`;
+// Pinned exactly. jsDelivr's "+esm" and esm.sh's unbundled builds of newer
+// versions statically import the Node-only package "ws" through realtime-js,
+// which a browser cannot resolve, so the SDK failed to load and sign-in fell
+// back to "could not start". This build is a single bundled module with no
+// bare imports; `npm run check:sdk` verifies the URL and its integrity hash.
+export const SDK_VERSION = "2.53.0";
+export const SDK_URL = `https://esm.sh/@supabase/supabase-js@${SDK_VERSION}?bundle-deps`;
 // Subresource-integrity hash for that exact file. The browser then refuses a
 // tampered or swapped build. Verified by `npm run check:sdk` (scripts/check-sdk.mjs);
 // the client downloads via the integrity-checked path when it is set.
-export const SDK_INTEGRITY = "sha384-ks/UAfQpP8G3g7zNQYLOZ5MD+ftV00rKJqKNfEbAexUckDNXwI7+keavNr2oluFk";
+export const SDK_INTEGRITY = "sha384-EQk5jZyWFuFgRzWN/xrLNXcue9Kirjx7IYVJI77K9XxPDFW9OnNFW9ESoRrOX1mv";
 
 export const AUTH_EVENTS = Object.freeze({
   ready: "ready",
@@ -36,7 +41,11 @@ export function classifyAuthError(error) {
   if (/email not confirmed/.test(message)) return { code: "email-not-confirmed" };
   if (/user already registered|already exists/.test(message)) return { code: "email-taken" };
   if (/password should be at least|weak.?password/.test(message)) return { code: "weak-password" };
+  if (/over_email_send_rate_limit|email rate limit/.test(message)) return { code: "email-rate-limited" };
   if (/rate limit|too many requests|for security purposes/.test(message)) return { code: "rate-limited" };
+  if (/email_address_invalid|invalid email/.test(message)) return { code: "email-invalid" };
+  if (/signups not allowed|signup.*disabled|email provider.*disabled/.test(message))
+    return { code: "signup-disabled" };
   if (/failed to fetch|networkerror|load failed|network request failed/.test(message))
     return { code: "network" };
   if (status >= 500) return { code: "server" };
@@ -50,6 +59,12 @@ export const AUTH_MESSAGES = Object.freeze({
   "email-taken": "An account already uses this email.",
   "weak-password": "Choose a longer password.",
   "rate-limited": "Too many attempts. Wait a minute and try again.",
+  "email-rate-limited":
+    "The built-in email sender has reached its hourly limit, so no confirmation email can be sent right now. Sign in with an existing account, or ask the deployment owner to configure a mail provider (docs/AUTHENTICATION.md).",
+  "email-invalid":
+    "That address was rejected. Use a real, deliverable email; domains such as example.com are refused.",
+  "signup-disabled":
+    "This deployment has account creation switched off in its authentication settings.",
   network: "The server could not be reached. Check your connection and try again.",
   server: "The sign-in service is having trouble. Try again shortly.",
   expired: "Your session expired. Sign in again to continue syncing.",
@@ -208,6 +223,9 @@ export function createAuthController({ config, loadSdk, sdk, timeoutMs = 12000, 
         update({ status: "ready", reason: "", expired: false, ...describe(restored?.session) }, AUTH_EVENTS.ready);
       } catch (error) {
         const line = classifyAuthError(error);
+        // Keep the underlying detail: a dashboard saying "could not start" with
+        // no reason is impossible to support.
+        console.warn("Authentication could not start:", error?.message || error);
         update(
           {
             status: "error",
@@ -218,6 +236,7 @@ export function createAuthController({ config, loadSdk, sdk, timeoutMs = 12000, 
                   ? "The authentication service could not be reached. Guest mode still works."
                   : "Authentication could not start. Guest mode still works.",
             error: line,
+            detail: String(error?.message || error || "").slice(0, 300),
           },
           AUTH_EVENTS.error,
         );
@@ -304,21 +323,22 @@ export function createAuthController({ config, loadSdk, sdk, timeoutMs = 12000, 
   return controller;
 }
 
-/**
- * Dynamic import with an optional Subresource Integrity check. Split out so
- * tests can replace it; the browser keeps the integrity attribute path.
- */
 export function IMPORT_WITH_INTEGRITY(url, integrity) {
-  if (!integrity) return import(url);
-  return (async () => {
-    const response = await fetch(url, { integrity, mode: "cors" });
-    if (!response.ok) throw new Error(`SDK download failed (${response.status})`);
-    const text = await response.text();
-    const blobUrl = URL.createObjectURL(new Blob([text], { type: "application/javascript" }));
-    try {
-      return await import(blobUrl);
-    } finally {
-      URL.revokeObjectURL(blobUrl);
+  // A dynamic import of the URL keeps the SDK's own relative imports working.
+  // Bundled builds cannot be re-imported from a blob, so the integrity check
+  // is a native module load of the same URL: the browser refuses the request
+  // when the bytes do not match `integrity`.
+  if (integrity && typeof document !== "undefined") {
+    const existing = document.querySelector('link[data-supabase-sdk]');
+    if (!existing) {
+      const link = document.createElement("link");
+      link.rel = "modulepreload";
+      link.href = url;
+      link.integrity = integrity;
+      link.crossOrigin = "anonymous";
+      link.dataset.supabaseSdk = "pinned";
+      document.head.append(link);
     }
-  })();
+  }
+  return import(url);
 }
