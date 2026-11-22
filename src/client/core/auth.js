@@ -35,22 +35,33 @@ export const RESET_PATH = "/auth/reset";
 
 /** Turn an SDK/network exception into a stable code the UI can translate. */
 export function classifyAuthError(error) {
-  const message = String(error?.message || error || "").toLowerCase();
-  const status = Number(error?.status || 0);
-  if (/invalid login credentials/.test(message)) return { code: "invalid-credentials" };
-  if (/email not confirmed/.test(message)) return { code: "email-not-confirmed" };
-  if (/user already registered|already exists/.test(message)) return { code: "email-taken" };
-  if (/password should be at least|weak.?password/.test(message)) return { code: "weak-password" };
-  if (/over_email_send_rate_limit|email rate limit/.test(message)) return { code: "email-rate-limited" };
-  if (/rate limit|too many requests|for security purposes/.test(message)) return { code: "rate-limited" };
-  if (/email_address_invalid|invalid email/.test(message)) return { code: "email-invalid" };
-  if (/signups not allowed|signup.*disabled|email provider.*disabled/.test(message))
+  // Supabase surfaces failures in several shapes: AuthApiError (message + status
+  // + code), AuthRetryableFetchError (status 0), a raw TypeError from fetch, or
+  // a plain string. Consider every field rather than only `message`, which is how
+  // "email rate limit exceeded" was reduced to "Something went wrong".
+  const message = String(error?.message || error?.msg || (typeof error === "string" ? error : "") || "").toLowerCase();
+  const code = String(error?.code || error?.error_code || "").toLowerCase();
+  const name = String(error?.name || "").toLowerCase();
+  const status = Number(error?.status || error?.statusCode || 0);
+  const all = `${message} ${code} ${name}`;
+
+  if (/invalid login credentials/.test(all)) return { code: "invalid-credentials" };
+  if (/email not confirmed/.test(all)) return { code: "email-not-confirmed" };
+  if (/user already registered|already exists/.test(all)) return { code: "email-taken" };
+  if (/password should be at least|weak.?password|weak_password/.test(all)) return { code: "weak-password" };
+  if (/over_email_send_rate_limit|email rate limit|email_rate_limit/.test(all) || (code === "429" && /email/.test(all)))
+    return { code: "email-rate-limited" };
+  if (/rate limit|too many requests|for security purposes|rate_limit/.test(all) || status === 429)
+    return { code: "rate-limited" };
+  if (/email_address_invalid|invalid email|validation_failed/.test(all)) return { code: "email-invalid" };
+  if (/signups not allowed|signup.*disabled|email provider.*disabled|signup_disabled/.test(all))
     return { code: "signup-disabled" };
-  if (/failed to fetch|networkerror|load failed|network request failed/.test(message))
+  if (/failed to fetch|networkerror|load failed|network request failed|fetch failed/.test(all) || name === "authretryablefetcherror" || status === 0)
     return { code: "network" };
   if (status >= 500) return { code: "server" };
-  if (/expired|invalid.*token|jwt/.test(message)) return { code: "expired" };
-  return { code: "unknown", detail: String(error?.message || error || "") };
+  if (/expired|invalid.*token|jwt|refresh_token_not_found/.test(all)) return { code: "expired" };
+  // Keep whatever the service actually said, so the UI can show it.
+  return { code: "unknown", detail: String(error?.message || error?.msg || error || "").slice(0, 200), status: status || null };
 }
 
 export const AUTH_MESSAGES = Object.freeze({
@@ -72,7 +83,10 @@ export const AUTH_MESSAGES = Object.freeze({
 });
 
 export function describeAuthError(line) {
-  return line?.message || AUTH_MESSAGES[line?.code] || AUTH_MESSAGES.unknown;
+  if (line?.message) return line.message;
+  if (AUTH_MESSAGES[line?.code]) return AUTH_MESSAGES[line.code];
+  // Never reduce a real service answer to a shrug: show what it said.
+  return line?.detail ? `The sign-in service said: ${line.detail}` : AUTH_MESSAGES.unknown;
 }
 
 function withTimeout(promise, ms, label) {

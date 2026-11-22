@@ -45,3 +45,18 @@ test("the auth controller reports the real cause of a failure", () => {
   }
   assert.match(source, /detail: String\(error\?\.message/);
 });
+
+test("classifies the shapes Supabase actually returns", async () => {
+  const { classifyAuthError } = await import("../src/client/core/auth.js");
+  // Observed from a live project: the auth API answers 429 with a numeric code.
+  assert.equal(classifyAuthError({ code: 429, message: "email rate limit exceeded" }).code, "email-rate-limited");
+  assert.equal(classifyAuthError({ message: "email rate limit exceeded", status: 429 }).code, "email-rate-limited");
+  assert.equal(classifyAuthError({ message: "Email not confirmed" }).code, "email-not-confirmed");
+  assert.equal(classifyAuthError({ code: "email_address_invalid", message: "Email address is invalid" }).code, "email-invalid");
+  assert.equal(classifyAuthError({ name: "AuthRetryableFetchError", message: "Failed to fetch", status: 0 }).code, "network");
+  assert.equal(classifyAuthError({ message: "Invalid login credentials", status: 400 }).code, "invalid-credentials");
+  // An unrecognised answer still carries the service's words.
+  const unknown = classifyAuthError({ message: "Some new service error", status: 418 });
+  assert.equal(unknown.code, "unknown");
+  assert.match(unknown.detail, /Some new service error/);
+});
