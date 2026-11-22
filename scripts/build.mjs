@@ -3,6 +3,20 @@ import path from "node:path";
 import { root, collectAssets, walk } from "./assets.mjs";
 const assets = await collectAssets(),
   out = path.join(root, "dist");
+// Fail closed: a server secret must never reach a build artefact or the bundle.
+const forbidden = [
+  /SUPABASE_SERVICE_ROLE_KEY/,
+  /IMPORT_TOKEN/,
+  /postgres(ql)?:\/\/[^\s"']*:[^\s"']*@/,
+  /sb_secret_[A-Za-z0-9_-]{10,}/,
+];
+for (const [url, asset] of Object.entries(assets)) {
+  if (url.startsWith("/public/")) continue;
+  for (const pattern of forbidden) {
+    if (pattern.test(asset.body))
+      throw Error(`Refusing to build: ${url} contains something that looks like a server secret (${pattern}).`);
+  }
+}
 await fs.rm(out, { recursive: true, force: true });
 for (const [url, asset] of Object.entries(assets)) {
   const file = path.join(out, "client", url.slice(1));
@@ -30,6 +44,19 @@ if (process.env.SITES_PROJECT_ID) {
       "\n",
   );
 }
+// Generated, never committed: the environment names each deployment needs.
+// Placeholders only; real values live in the host's environment variables.
+const envTemplate = [
+  "# Copy to .env.local or set in the hosting dashboard. Never commit values.",
+  "# Public (safe in the browser, protected by row-level security):",
+  "SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co",
+  "SUPABASE_PUBLISHABLE_KEY=YOUR-PUBLISHABLE-OR-ANON-KEY",
+  "# Server-only (pack importer; never exposed to the browser):",
+  "SUPABASE_SERVICE_ROLE_KEY=",
+  "IMPORT_TOKEN=",
+  "",
+].join("\n");
+await fs.writeFile(path.join(out, "env.example"), envTemplate);
 console.log(
   `Built ${Object.keys(assets).length} frontend assets and the compiler Worker in dist/.`,
 );

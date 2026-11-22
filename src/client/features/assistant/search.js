@@ -250,7 +250,7 @@ const StudySearch = (() => {
         text:
           route.kind === "clarify"
             ? "Sure — which subject or topic would you like to explore?\n\nChoose one below. After we discuss a topic, “explore it”, “explain more” and “give an example” will continue that topic."
-            : "Hi Raman. Choose a subject to explore, ask a specific question, or check what to study next.",
+            : "Hi there. Choose a subject to explore, ask a specific question, or check what to study next.",
         sources: [],
         suggestions: [
           ...choose,

@@ -16,8 +16,14 @@ const textLines = (lines) =>
         .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
         .slice(0, 32000)
     : "";
-export function normalizeCompileResult(d) {
+export function normalizeCompileResult(d, language = "cpp") {
   const b = d.buildResult || d;
+  const provider =
+    language === "c"
+      ? "Compiler Explorer · GCC 13.2 · C17"
+      : language === "java"
+        ? "Compiler Explorer · OpenJDK 21"
+        : "Compiler Explorer · GCC 13.2 · C++17";
   return {
     compiled: b.code === 0,
     executed: d.didExecute === true,
@@ -28,7 +34,7 @@ export function normalizeCompileResult(d) {
       .join("\n"),
     timedOut: !!(d.timedOut || b.timedOut),
     truncated: !!(d.truncated || b.truncated),
-    provider: "Compiler Explorer · GCC 13.2 · C++17",
+    provider,
   };
 }
 export async function handleAPI(request, env = {}, fetcher = fetch) {
@@ -94,8 +100,21 @@ export async function handleAPI(request, env = {}, fetcher = fetch) {
   limits.set(key, recent);
   if (limits.size > 2000)
     for (const [k, v] of limits) if (now - v.at(-1) > 60000) limits.delete(k);
+  const lang = body.language === "c" ? "c" : body.language === "java" ? "java" : "cpp";
+  const compilerUrl =
+    lang === "java"
+      ? "https://godbolt.org/api/compiler/java2100/compile"
+      : "https://godbolt.org/api/compiler/g132/compile";
+  const userArguments =
+    lang === "c"
+      ? "-std=c17 -O0 -Wall -Wextra"
+      : lang === "java"
+        ? ""
+        : "-std=c++17 -O0 -Wall -Wextra";
+  const godboltLang = lang === "c" ? "c" : lang === "java" ? "java" : "c++";
+
   try {
-    const r = await fetcher("https://godbolt.org/api/compiler/g132/compile", {
+    const r = await fetcher(compilerUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -104,12 +123,12 @@ export async function handleAPI(request, env = {}, fetcher = fetch) {
       body: JSON.stringify({
         source: body.code,
         options: {
-          userArguments: "-std=c++17 -O0 -Wall -Wextra",
+          userArguments,
           compilerOptions: { executorRequest: true },
           filters: { execute: true },
           executeParameters: { args: [], stdin: body.stdin, runtimeTools: [] },
         },
-        lang: "c++",
+        lang: godboltLang,
         allowStoreCodeDebug: false,
       }),
       signal: AbortSignal.timeout(30000),
@@ -124,7 +143,7 @@ export async function handleAPI(request, env = {}, fetcher = fetch) {
     const d = await r.json();
     if (!d || typeof d !== "object" || !Number.isInteger(d.code))
       return json({ error: "Compiler returned an unexpected response." }, 502);
-    return json(normalizeCompileResult(d));
+    return json(normalizeCompileResult(d, lang));
   } catch (e) {
     return json(
       {

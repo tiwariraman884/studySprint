@@ -1,55 +1,84 @@
 # Architecture
 
-Study Sprint is a dependency-free JavaScript application with a small HTTP backend. It keeps academic content separate from interaction logic and separates code execution from the dashboard.
+Dependency-free JavaScript in the browser, a small HTTP Worker on the server, and
+PostgreSQL (Supabase) for shared content and per-student records.
 
 ```mermaid
 flowchart TD
-  UI[Browser interface] --> App[Application context]
-  App --> Content[Subject and question modules]
-  App --> Store[Browser storage and backups]
-  App --> Local[Isolated local workers]
-  App --> API[Compiler API]
+  UI[Feature modules] --> CTX[Application context]
+  CTX --> WS[Workspace controller]
+  WS --> Guest[Browser storage · guest]
+  WS --> Queue[Pending queue · IndexedDB]
+  WS --> Remote[Cloud repository]
+  WS --> Auth[Auth controller]
+  Auth --> SDK[supabase-js · pinned]
+  Remote --> DB[(PostgreSQL + RLS)]
+  SDK --> DB
+  UI --> Content[Course pack catalog]
+  UI --> Local[Isolated lab workers]
+  UI --> API[Compiler API]
   API --> CE[Compiler Explorer]
 ```
 
-## Application composition
+## Layers
 
-`src/client/index.js` starts `createApplication()` from `app/create-application.js`. The composition root imports the content catalog and shared UI utilities, registers each feature's methods on one application context, initializes saved state, attaches event listeners and renders the first screen.
-
-Feature modules expose `register(app)`. Each method accesses dependencies explicitly through `app`, such as `app.TOPICS`, `app.s`, `app.save()` and `app.render()`. This preserves coordinated progress updates while preventing window-global declarations and duplicate function overrides. Register all methods before initialization because a saved plan may need the planner during startup.
-
-The application currently assumes one mounted instance per page. `app/events.js` is the central DOM event-delegation layer. UI templates use the shared escaping helper for entered text. Modules return HTML for the existing dialog/navigation structure; this is not a React application and needs no framework build step.
-
-## Boundaries
-
-| Layer | Depends on | Must not do |
+| Layer | Depends on | Must not |
 | --- | --- | --- |
-| Content modules | Other content modules | Access the DOM or browser storage |
-| Assistant search | Supplied catalog, history and progress context | Invent answers or execute user code |
-| Feature UI | Application context and browser APIs | Read server secrets |
-| State and settings | Browser storage and validated backups | Claim automatic cross-device sync |
-| Isolated lab frame | Worker runtime and posted run messages | Read the parent dashboard's storage |
-| Compiler API | Bounded request and fixed upstream compiler | Execute programs in the hosting process |
-| Build scripts | Source files and Node built-ins | Package credentials, PDFs or user backups |
+| Content modules | Other content modules | Touch the DOM or storage |
+| Pack contract / catalog | Content modules | Know about a user |
+| Core (`src/client/core`) | Pure helpers and injected boundaries | Touch the DOM |
+| Feature UI | Application context | Read server secrets or call the SDK directly |
+| Workspace controller | Auth, stores, features | Invent a second source of truth |
+| Auth controller | supabase-js only | Render anything |
+| Server | Worker APIs | Send a service key to a page |
+| Build | Source files | Emit a bundle containing a secret |
 
-## Content catalog
+## Composition
 
-Each module in `src/content/subjects/` contains a subject, its syllabus units, topic guides and primary reading links. `src/content/index.js` combines these with chapter questions, long answers, lab templates and quiz definitions. Short-question and quiz views derive from this catalog. Topic IDs remain stable because progress and question references depend on them.
+`src/client/index.js` calls `createApplication()`:
 
-## State and backups
+1. Content modules are imported and every feature registers its methods on one
+   application context (`app`).
+2. `initializeState` loads saved guest state and fills defaults.
+3. Events are delegated from `app/events.js`.
+4. The first `render()` runs, so studying works immediately.
+5. `createWorkspace(app)` installs persistence, applies the pack and subject
+   selection, starts the auth lifecycle and offers first-visit onboarding.
 
-State lives in `app.s` and persists under `raman-cia2-sprint-v1`. View filters, running workers and editor UI status remain transient context fields. The settings feature validates basic topic progress, custom plans, long-answer drafts and the newer assistant/lab fields in stages. Unknown references are filtered from imported chat context.
+The workspace controller is what makes the old feature API keep working: features
+still call `app.save()` and `app.render()`, and the controller decides whether
+that means browser storage or a queued cloud write. Subject selection rebuilds
+`app.SUBJECTS`, `app.TOPICS`, `app.LONG`, `app.CURRICULUM`, `app.QUIZ_BANK` and
+the exam-focus map, so every page filters consistently without a per-page
+rewrite.
+
+## Boundaries that are tested
+
+- No module in `src/client`, `src/content` or `public` may mention a service-role
+  key, a database URL with a password, or `postgres://`.
+- The build fails if any of those patterns reach an asset.
+- The server injects only `supabaseUrl` and `supabaseAnonKey`.
+- Every browser-side fingerprint function is compared with its SQL counterpart
+  against a real database.
+
+## Lookups and keys
+
+`app.getTopic` and `app.getSubject` accept both a namespaced key
+(`cia-2-2025-26:de:de1`) and a legacy bare id (`de1`), so saved references from
+the original dashboard keep resolving. Records are always keyed by the
+namespaced value, which is what the database stores and what a new device
+resolves through `topic_ids_for_keys`.
 
 ## Execution and AI
 
-`features/lab/frame.js` contains a self-contained frame entry function. Its source is embedded in a sandboxed iframe. That frame launches a fresh worker for each Python or JavaScript run, forwards bounded output and terminates it on Stop. The main dashboard verifies the source window and message channel.
+Unchanged from the original design: `features/lab/frame.js` builds a
+self-contained sandboxed worker frame for Python and JavaScript; C++17 goes
+through `src/server/api/compiler.js` to a fixed upstream compiler; the optional
+assistant loads a quantized model on demand after a pure retrieval pass.
 
-`public/workers/ai-worker.js` loads Transformers.js and a quantized model on demand. It streams optional AI answers. The pure `features/assistant/search.js` module handles syllabus matching, follow-up context and authored responses before AI is considered. Its behavior is tested without loading model weights.
+## Build
 
-`src/server/api/compiler.js` validates same-origin JSON requests and code/stdin limits, calls only the configured Compiler Explorer endpoint and normalizes compilation/runtime results. Its in-memory rate limiter is per isolate, not a globally enforced quota or a complete anti-abuse system.
-
-## Build and serving
-
-`scripts/assets.mjs` collects only `public/`, `src/client/` and `src/content/`. `scripts/build.mjs` writes those assets to `dist/client/`, copies backend modules into `dist/server/`, and emits an entry point that embeds the asset catalog. `src/server/app.js` serves assets and routes `/api/*` to the compiler handler. The Node development adapter uses the same handler.
-
-Generated output is ignored by Git. A fresh clone can reproduce it with `npm run build`.
+`scripts/assets.mjs` collects `public/`, `src/client/` and `src/content/`, skips
+`config.local.js`, and refuses nothing silently. `scripts/build.mjs` writes
+`dist/client`, copies `dist/server`, embeds the asset catalog and scans the
+output for secrets before finishing.

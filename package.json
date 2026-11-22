@@ -1,9 +1,9 @@
 {
   "name": "study-sprint",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Six-subject exam preparation dashboard with an isolated coding lab and syllabus assistant.",
+  "description": "Multi-student exam preparation workspace: versioned course packs, private cloud progress, a planner, practice, revision and an isolated coding lab.",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -12,7 +12,11 @@
     "start": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
+    "test:pg": "node --test tests/integration/pg-harness.mjs",
+    "test:smoke": "node tests/smoke/render-smoke.mjs",
     "check": "node scripts/check.mjs",
-    "verify": "npm run check && npm test && npm run build"
+    "check:sdk": "node scripts/check-sdk.mjs",
+    "seed:packs": "node scripts/seed-packs.mjs",
+    "verify": "npm run check && npm test && npm run test:smoke && npm run build"
   }
 }

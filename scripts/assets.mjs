@@ -22,6 +22,8 @@ export async function collectAssets() {
     for (const file of await walk(path.join(root, folder))) {
       const type = types[path.extname(file)];
       if (!type) continue;
+      // Local-only configuration is never bundled or committed.
+      if (/config\.local\.js$/.test(file)) continue;
       const relative = path
         .relative(path.join(root, folder === "public" ? "public" : "."), file)
         .split(path.sep)

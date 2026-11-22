@@ -5,6 +5,8 @@ import { StudySearch } from "../features/assistant/search.js";
 import { labFrameMain } from "../features/lab/frame.js";
 import { initializeState } from "./state.js";
 import { registerEvents } from "./events.js";
+import { localISODate } from "../core/dates.js";
+import { createWorkspace } from "../core/workspace-controller.js";
 import { register as register_shell } from "../features/shell/index.js";
 import { register as register_revision } from "../features/revision/index.js";
 import { register as register_subjects } from "../features/subjects/index.js";
@@ -17,6 +19,15 @@ import { register as register_settings } from "../features/settings/index.js";
 import { register as register_materials } from "../features/materials/index.js";
 import { register as register_lab } from "../features/lab/index.js";
 import { register as register_assistant } from "../features/assistant/index.js";
+import { register as register_studymap } from "../features/studymap/index.js";
+import { register as register_practice } from "../features/practice/index.js";
+import { register as register_account } from "../features/account/ui.js";
+
+/** Local calendar day, shared with the core date helpers. */
+function localToday() {
+  return localISODate();
+}
+
 export function createApplication() {
   const app = {
     ...content,
@@ -24,6 +35,7 @@ export function createApplication() {
     icon,
     StudySearch,
     LAB_FRAME_SOURCE: "(" + labFrameMain.toString() + ")()",
+    localToday,
   };
   register_shell(app);
   register_revision(app);
@@ -37,9 +49,40 @@ export function createApplication() {
   register_materials(app);
   register_lab(app);
   register_assistant(app);
+  register_studymap(app);
+  register_practice(app);
+  register_account(app);
   initializeState(app);
   registerEvents(app);
-  app.save();
+  // The workspace controller installs persistence (guest or cloud), applies the
+  // student's pack/subject selection and starts the auth lifecycle. Rendering
+  // starts first so the interface is usable while the account is checked.
   app.render();
+  const workspace = createWorkspace(app);
+  workspace.init()
+    .then(() => {
+      try {
+        app.render();
+      } catch (error) {
+        // A rendering problem must never block onboarding or studying.
+        console.error("Post-init render failed", error);
+      }
+      const guest = app.workspace.state.mode === "guest";
+      const onboarded = !!app.s.profile?.onboardingCompletedAt;
+      // Offer the short setup once per session on a first visit. A student
+      // who finished onboarding, or a returning guest in this session, is
+      // not asked again.
+      if (guest && !onboarded && !sessionStorage.getItem("study-sprint:onboarded-offered")) {
+        try {
+          // Mark the offer as made only when it actually opened, so a failure
+          // does not permanently suppress the setup for this session.
+          app.openOnboarding({ reason: "first-visit" });
+          sessionStorage.setItem("study-sprint:onboarded-offered", "1");
+        } catch (error) {
+          console.error("Could not open onboarding", error);
+        }
+      }
+    })
   return app;
 }
+

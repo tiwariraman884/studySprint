@@ -41,6 +41,21 @@ export function labFrameMain() {
           send("running", "Running Python…");
           await py.runPythonAsync(code);
           send("done", "Python finished · exit 0");
+        } else if (language === "sql") {
+          send("status", "Loading SQL engine…");
+          importScripts(
+            "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js",
+          );
+          const py = await loadPyodide({
+            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/",
+            stdout: (t) => send("stdout", t + "\n"),
+            stderr: (t) => send("stderr", t + "\n"),
+          });
+          send("running", "Executing SQL queries…");
+          const escaped = code.replace(/\\/g, "\\\\").replace(/"""/g, '\\"\\"\\"');
+          const pyCode = `import sqlite3\ncon = sqlite3.connect(':memory:')\ncur = con.cursor()\nscript = """${escaped}"""\nfor stmt in script.split(';'):\n    s = stmt.strip()\n    if s:\n        res = cur.execute(s)\n        if cur.description:\n            for r in res.fetchall():\n                print(r)\ncon.commit()`;
+          await py.runPythonAsync(pyCode);
+          send("done", "SQL finished · exit 0");
         } else {
           send("running", "Running JavaScript…");
           let lines = stdin.split("\n"),

@@ -1,3 +1,5 @@
+import { DEFAULT_ACADEMIC, normalizeAcademic } from "../core/academic.js";
+
 export function initializeState(app) {
   app.esc = (x) =>
     String(x ?? "").replace(
@@ -11,10 +13,19 @@ export function initializeState(app) {
           "'": "&#39;",
         })[c],
     );
+  // The storage key is unchanged so existing progress is found and upgraded in
+  // place by src/client/core/migration.js. The legacy name is kept for
+  // compatibility; it is not a user-facing identity.
   app.KEY = "raman-cia2-sprint-v1";
+  // Library defaults only: onboarding and the workspace controller replace the
+  // start date and preferences with the student's own local values.
   app.defaults = {
-    version: 1,
-    start: "2026-11-14",
+    version: 2,
+    start: "",
+    packId: null,
+    subjectKeys: null,
+    profile: null,
+    preferences: null,
     status: {},
     reviews: {},
     completedAt: {},
@@ -23,14 +34,25 @@ export function initializeState(app) {
     durations: {},
     history: [],
     missed: [],
+    wrongAnswers: {},
+    confidence: {},
+    revisionNotes: {},
+    pins: {},
+    exams: [],
+    academic: { ...DEFAULT_ACADEMIC, confirmedAlternatives: {} },
     lastTopic: "de1",
     hinglish: true,
     timer: { remaining: 1500, running: false, end: 0 },
     quiz: null,
+    labRuns: [],
+    labSubmissions: [],
+    labObservations: {},
   };
   app.DEFAULT_DURATIONS = Object.fromEntries(
     app.PLAN.flatMap((p) => p.blocks).map((b) => [b.id, b.minutes]),
   );
+  // Raw authored ids: the active pack view may namespace topic ids, so
+  // isLastDay() compares the topic's rawId instead of a literal id.
   app.LAST_DAY_IDS = new Set([
     "de2",
     "de3",
@@ -59,6 +81,12 @@ export function initializeState(app) {
     app.s = structuredClone(app.defaults);
     app.storageOK = false;
   }
+  app.s.academic = normalizeAcademic(app.s.academic || DEFAULT_ACADEMIC);
+  app.s.wrongAnswers ||= {};
+  app.s.confidence ||= {};
+  app.s.revisionNotes ||= {};
+  app.s.pins ||= {};
+  app.s.exams ||= [];
   app.view = "overview";
   app.selectedDay = 1;
   app.subjectFilter = "all";
@@ -79,6 +107,11 @@ export function initializeState(app) {
     app.TOPICS.find((t) => t.id === id) ||
     app.QUIZ_BANK.find((t) => t.id === id);
   app.getSubject = (id) => app.SUBJECTS.find((x) => x.id === id);
+  app.rawSubjectId = (id) => app.getSubject(id)?.rawId || String(id || "").split(":").pop();
+  app.isLastDay = (id) => {
+    const t = app.getTopic(id);
+    return !!t && app.LAST_DAY_IDS.has(t.rawId || t.id);
+  };
   app.topicKey = (id) => app.getTopic(id)?.topicId || id;
   app.status = (id) => app.s.status[app.topicKey(id)] || "not-started";
   app.statusName = (v) =>
@@ -107,12 +140,15 @@ export function initializeState(app) {
   app.unitFilter = "all";
   app.longSource = "all";
   app.longQuery = "";
-  app.syllabusSubject = "de";
+  app.syllabusSubject = app.SUBJECTS[0]?.id || "de";
   app.activeLong = null;
   app.s.scope = app.s.scope || "exam";
+  // Dates use the student's local calendar day; an empty start is filled from
+  // their own clock, never from a fixed exam date.
+  if (!app.s.start) app.s.start = app.todayISO();
   app.s.planPrefs = app.s.planPrefs || {
-    days: 4,
-    hours: 7,
+    days: 7,
+    hours: 4,
     start: app.s.start,
     scope: "exam",
     subjects: app.SUBJECTS.map((x) => x.id),
@@ -122,7 +158,7 @@ export function initializeState(app) {
   app.s.longScores = app.s.longScores || {};
   app.s.longDone = app.s.longDone || {};
   for (const l of app.LONG.filter(
-    (x) => x.subject === "py" && !x.id.startsWith("ch-"),
+    (x) => (x.rawSubject || x.subject) === "py" && !(x.rawId || x.id).startsWith("ch-"),
   ))
     l.code = l.related
       .map((id) => app.getTopic(id).code)
@@ -142,6 +178,9 @@ export function initializeState(app) {
   app.s.lab.drafts ||= {};
   app.s.lab.inputs ||= {};
   app.practiceMode = "all";
+  app.practiceTab = "short";
+  app.studymapTab = "map";
+  app.activeBridgeCourse = false;
   app.quizUnit = "all";
   app.materialSubject = "all";
   app.materialUnit = null;
@@ -163,7 +202,11 @@ export function initializeState(app) {
   app.aiJob = null;
   app.aiTimer = null;
   app.NAV = [
-    ["overview", "grid", "Overview"],
+    ["overview", "grid", "Today"],
+    ["studymap", "book", "Study Map"],
+    ["practice", "question", "Practice"],
+    ["lab", "code", "Smart Lab"],
+    ["revision", "revision", "Revision"],
     ["plan", "calendar", "Study plan"],
     ["subjects", "book", "My subjects"],
     ["materials", "layers", "Study materials"],
@@ -171,13 +214,14 @@ export function initializeState(app) {
     ["questions", "question", "Short questions"],
     ["long", "code", "Long answers"],
     ["quiz", "quiz", "Practice quizzes"],
-    ["lab", "code", "Smart lab"],
+    ["curriculum", "layers", "Coverage matrix"],
     ["assistant", "spark", "Study assistant"],
-    ["revision", "revision", "Revision room"],
     ["priority", "flag", "Priority view"],
   ];
-  app.chapterLabel = (sub, n) =>
-    `${sub === "py" ? "Exercise" : sub === "uhv" ? "Module" : "Unit"} ${n}`;
+  app.chapterLabel = (sub, n) => {
+    const raw = app.rawSubjectId(sub);
+    return `${raw === "py" ? "Exercise" : raw === "uhv" ? "Module" : "Unit"} ${n}`;
+  };
   app.modeLabel = (x) =>
     ({ theory: "Theory", numerical: "Numerical / trace", code: "Programming" })[
       x
