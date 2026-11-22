@@ -11,11 +11,70 @@ import {
   escapeAttr,
 } from "./index.js";
 import { validateProfile, normalizeProfile, normalizePreferences, validatePreferences } from "../../core/profile.js";
+import { describePasswordProblems, MIN_LENGTH } from "../../core/password-policy.js";
 import { describeAuthError, classifyAuthError } from "../../core/auth.js";
 import { buildPackView } from "../../core/workspace.js";
 import { isDateString, localISODate, addDays } from "../../core/dates.js";
+import { normalizeAcademic, academicSummary } from "../../core/academic.js";
 
 export function register(app) {
+  app.academicSummary = academicSummary;
+  app.academic = normalizeAcademic(app.s?.academic || {});
+
+  app.saveAcademicProfile = function saveAcademicProfile() {
+    const branch = document.getElementById("academicBranch")?.value || app.academic.branchId;
+    const semester = Number(document.getElementById("academicSemester")?.value);
+    const college = document.getElementById("academicCollege")?.value || app.academic.collegeId;
+    const batch = document.getElementById("academicBatch")?.value || app.academic.batchId;
+    const group = document.getElementById("academicGroup")?.value || app.academic.firstYearGroup;
+    const bridge = document.getElementById("academicBridge")?.checked;
+    const summary = app.academicSummary({
+      collegeId: college,
+      batchId: batch,
+      branchId: branch,
+      semester,
+      firstYearGroup: group,
+      bridgeCourses: bridge,
+      confirmedAlternatives: app.academic.confirmedAlternatives,
+    });
+    const academic = normalizeAcademic({ ...app.academic, collegeId: college, batchId: batch, branchId: branch, semester, firstYearGroup: group, bridgeCourses: bridge });
+    app.s.academic = academic;
+    app.academic = academic;
+    app.activeBranchId = academic.branchId;
+    app.activeSemester = academic.semester;
+    app.activeFirstYearGroup = academic.firstYearGroup;
+    app.activeBridgeCourses = academic.bridgeCourses;
+    app.save();
+    const applicable = summary.authoredIds || [];
+    const mapped = applicable
+      .map((id) => app.SUBJECTS.find((s) => s.rawId === id)?.id)
+      .filter(Boolean);
+    const current = new Set(app.SUBJECT_KEYS || []);
+    const next = mapped.filter((k) => current.has(k));
+    if (mapped.length && next.length) {
+      app.workspace?.setSelection({ packId: app.PACK_ID, subjectKeys: next });
+      app.toast?.("Academic context saved. Applicable authored subjects selected; progress kept.");
+    } else if (mapped.length) {
+      app.toast?.("Academic context saved. No authored subject matches this semester, so your selection is unchanged.");
+    } else {
+      app.toast?.("Academic context saved. The curriculum could not resolve this semester yet.");
+    }
+  };
+
+  app.applyAcademicSubjects = function applyAcademicSubjects() {
+    const summary = app.academicSummary(app.s.academic);
+    const mapped = (summary.authoredIds || [])
+      .map((id) => app.SUBJECTS.find((s) => s.rawId === id)?.id)
+      .filter(Boolean);
+    const current = new Set(app.SUBJECT_KEYS || []);
+    const next = mapped.filter((k) => current.has(k));
+    if (next.length) {
+      app.workspace?.setSelection({ packId: app.PACK_ID, subjectKeys: next });
+      return true;
+    }
+    return false;
+  };
+
   const ui = {
     mode: "signin",
     busy: false,
@@ -89,7 +148,10 @@ export function register(app) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.authEmail = "Enter a valid email address.";
     if (mode !== "reset") {
       const password = String(data.get("authPassword") || "");
-      if (password.length < 8) errors.authPassword = "Use at least 8 characters.";
+      // Name exactly what is missing; "longer" was misleading when the real
+      // requirement was a missing capital, digit or symbol.
+      const passwordProblem = describePasswordProblems(password);
+      if (passwordProblem) errors.authPassword = passwordProblem;
       if (mode === "signup" && password !== String(data.get("authPasswordConfirm") || ""))
         errors.authPasswordConfirm = "The two passwords do not match.";
     }
@@ -156,12 +218,6 @@ export function register(app) {
   // ------------------------------------------------------------------ onboarding
 
   app.openOnboarding = function openOnboarding({ reason } = {}) {
-    // A cold load may still be composing the pack. Wait for it rather than
-    // throwing, and never leave the dialog half-open.
-    if (!app.PACK) {
-      setTimeout(() => app.openOnboarding({ reason }), 120);
-      return;
-    }
     const pack = app.PACK;
     ui.onboarding = {
       open: true,
@@ -169,18 +225,14 @@ export function register(app) {
       reason,
       profile: { ...app.s.profile },
       packId: app.PACK_ID,
-      subjectKeys: app.SUBJECT_KEYS?.length
-        ? [...app.SUBJECT_KEYS]
-        : pack.subjects.map((s) => s.subject.key),
+      subjectKeys: app.SUBJECT_KEYS.length ? [...app.SUBJECT_KEYS] : pack.subjects.map((s) => s.subject.key),
       preferences: normalizePreferences(app.s.preferences || {}),
       exams: [{ title: "Internal assessment", examDate: "" }],
       errors: {},
     };
-    app.onboardingState = ui.onboarding;
     const d = dialog("authDialog");
     d.innerHTML = renderOnboarding(app.ctxForAccount());
     if (!d.open) d.showModal();
-    document.getElementById("displayName")?.focus();
   };
 
   app.onboardingBack = function onboardingBack() {
@@ -265,23 +317,7 @@ export function register(app) {
       const profile = { ...o.profile, onboardingCompletedAt: new Date().toISOString() };
       app.s.profile = profile;
       app.s.preferences = o.preferences;
-      // The workspace owns the profile the sidebar and greeting read, so it
-      // must see the finished one before the next render.
-      if (app.workspace) {
-        app.workspace.state.profile = profile;
-        app.workspace.state.preferences = o.preferences;
-      }
-      app.initials = profile.displayName
-        .trim()
-        .split(/\s+/)
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
-      // Persist the narrowed selection, not just the rendered view: a reload
-      // must restore exactly the subjects the student chose.
-      app.workspace.setSelection({ packId: o.packId, subjectKeys: o.subjectKeys }, { persist: true });
-      app.s.subjectKeys = o.subjectKeys;
+      app.workspace.setSelection({ packId: o.packId, subjectKeys: o.subjectKeys }, { persist: false });
       if (app.workspace.state.mode === "cloud" && app.workspace.remote) {
         await app.workspace.remote.completeOnboarding({ displayName: profile.displayName, subjectKeys: o.subjectKeys });
         await app.workspace.remote.saveProfile({

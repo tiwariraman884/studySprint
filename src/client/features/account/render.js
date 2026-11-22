@@ -9,6 +9,7 @@ import { LANGUAGE_LABELS, STUDY_DAYS, initialsOf, validateProfile, validatePrefe
 import { packCatalogue } from "../../core/workspace.js";
 import { describeAuthError, AUTH_MESSAGES } from "../../core/auth.js";
 import { isDateString } from "../../core/dates.js";
+import { MIN_LENGTH } from "../../core/password-policy.js";
 
 const field = ({ id, label, value = "", type = "text", required = false, hint = "", error = "", autocomplete, placeholder = "", maxlength = 120, extra = "" }) => `
   <div class="field ${error ? "invalid" : ""}">
@@ -75,7 +76,7 @@ export function renderAuth(ctx, mode = "signin") {
       <p class="small muted">Your progress, notes and drafts will sync privately across your devices. You can still study as a guest.</p>
       <form id="authForm" data-auth-form="signup" ${busy} novalidate>
         ${field({ id: "authEmail", label: "Email", type: "email", required: true, autocomplete: "email", error: authForm?.fieldErrors?.authEmail })}
-        ${field({ id: "authPassword", label: "Password", type: "password", required: true, autocomplete: "new-password", hint: "At least 8 characters. Use a password you don’t reuse.", error: authForm?.fieldErrors?.authPassword })}
+        ${field({ id: "authPassword", label: "Password", type: "password", required: true, autocomplete: "new-password", hint: `At least ${MIN_LENGTH} characters with a lowercase letter, an uppercase letter, a number and a symbol.`, error: authForm?.fieldErrors?.authPassword })}
         ${field({ id: "authPasswordConfirm", label: "Confirm password", type: "password", required: true, autocomplete: "new-password", error: authForm?.fieldErrors?.authPasswordConfirm })}
         <div class="dialog-actions"><button class="text-btn" type="button" data-action="auth-mode" data-mode="signin">I already have an account</button>
           <button class="primary-btn" type="submit" ${loading ? "disabled" : ""}>Create account</button></div>
