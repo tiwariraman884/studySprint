@@ -156,6 +156,12 @@ export function register(app) {
   // ------------------------------------------------------------------ onboarding
 
   app.openOnboarding = function openOnboarding({ reason } = {}) {
+    // A cold load may still be composing the pack. Wait for it rather than
+    // throwing, and never leave the dialog half-open.
+    if (!app.PACK) {
+      setTimeout(() => app.openOnboarding({ reason }), 120);
+      return;
+    }
     const pack = app.PACK;
     ui.onboarding = {
       open: true,
@@ -163,14 +169,18 @@ export function register(app) {
       reason,
       profile: { ...app.s.profile },
       packId: app.PACK_ID,
-      subjectKeys: app.SUBJECT_KEYS.length ? [...app.SUBJECT_KEYS] : pack.subjects.map((s) => s.subject.key),
+      subjectKeys: app.SUBJECT_KEYS?.length
+        ? [...app.SUBJECT_KEYS]
+        : pack.subjects.map((s) => s.subject.key),
       preferences: normalizePreferences(app.s.preferences || {}),
       exams: [{ title: "Internal assessment", examDate: "" }],
       errors: {},
     };
+    app.onboardingState = ui.onboarding;
     const d = dialog("authDialog");
     d.innerHTML = renderOnboarding(app.ctxForAccount());
     if (!d.open) d.showModal();
+    document.getElementById("displayName")?.focus();
   };
 
   app.onboardingBack = function onboardingBack() {

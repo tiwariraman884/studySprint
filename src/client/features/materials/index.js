@@ -10,11 +10,11 @@ export function register(app) {
           `<section class="material-section"><div class="section-head"><div><h2>${c.name}</h2><p class="sub">${c.code} · ${c.units.length} ${c.id === "py" ? "exercises" : "chapters"}</p></div>${app.subjectIcon(c.id)}</div><div class="chapter-grid">${c.units
             .map((u) => {
               const ts = app.TOPICS.filter(
-                  (t) => t.subject === c.id && t.unit === u.number,
+                  (t) => t.subject === (c.key ?? c.id) && t.unit === u.number,
                 ),
                 q = app.CHAPTER_BANK.find(
                   (q) =>
-                    q.subject === c.id &&
+                    q.subject === (c.key ?? c.id) &&
                     q.unit === u.number &&
                     q.kind === "long",
                 );

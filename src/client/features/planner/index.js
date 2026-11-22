@@ -52,7 +52,7 @@ export function register(app) {
       }
       const blocks = [];
       for (const sub of app.SUBJECTS) {
-        const group = selected.filter((t) => t.subject === sub.id);
+        const group = selected.filter((t) => t.subject === (sub.key ?? sub.id));
         if (group.length)
           blocks.push({
             id: `p${stamp}-${d}-${sub.id}`,

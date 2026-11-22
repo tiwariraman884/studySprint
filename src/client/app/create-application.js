@@ -73,15 +73,16 @@ export function createApplication() {
       // who finished onboarding, or a returning guest in this session, is
       // not asked again.
       if (guest && !onboarded && !sessionStorage.getItem("study-sprint:onboarded-offered")) {
-        sessionStorage.setItem("study-sprint:onboarded-offered", "1");
         try {
+          // Mark the offer as made only when it actually opened, so a failure
+          // does not permanently suppress the setup for this session.
           app.openOnboarding({ reason: "first-visit" });
+          sessionStorage.setItem("study-sprint:onboarded-offered", "1");
         } catch (error) {
           console.error("Could not open onboarding", error);
         }
       }
     })
-    .catch((error) => console.error("Workspace init failed", error));
   return app;
 }
 

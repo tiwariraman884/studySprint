@@ -53,7 +53,7 @@ export function register(app) {
         "",
       )}</section><aside class="stack right-column"><section class="card"><div class="card-title"><h2>Your subjects</h2><span class="count">${app.TOPICS.length} topics</span></div>${app.SUBJECTS.map(
       (sub) => {
-        const a = ts.filter((t) => t.subject === sub.id);
+        const a = ts.filter((t) => t.subject === (sub.key ?? sub.id));
         return `<button class="subject-summary" data-action="subject" data-id="${sub.id}"><span class="flex">${app.subjectIcon(sub.id)}<strong>${sub.name}</strong><span class="percent">${app.fraction(a)}%</span></span><div class="progress"><i style="width:${app.fraction(a)}%"></i></div><span class="count-text">${a.filter((t) => app.status(t.id) === "done").length}/${a.length} in this scope</span></button>`;
       },
     ).join("")}</section>${app.timerCard()}</aside></div>`;

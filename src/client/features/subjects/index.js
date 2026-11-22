@@ -68,8 +68,9 @@ export function register(app) {
     const ts = app.filteredTopics();
     return `${app.header("Your subjects. Every unit in view.", "Choose a subject, filter its units, then work through the topic groups.", "FULL SYLLABUS · PROGRESS CHECKLIST")}<div class="subject-tiles">${app.SUBJECTS.map(
       (sub) => {
-        const st = app.activeTopics().filter((t) => t.subject === sub.key);
-        return `<button class="subject-tile ${app.subjectFilter === sub.key ? "selected" : ""}" data-action="subject" data-id="${sub.key}">${app.subjectIcon(sub.key)}<strong>${sub.name}</strong><span>${app.CURRICULUM.find((c) => c.id === sub.key).code}</span><div class="progress"><i style="width:${app.fraction(st)}%"></i></div><small>${st.filter((t) => app.status(t.id) === "done").length}/${st.length} topics</small></button>`;
+        const key = sub.key ?? sub.id;
+        const st = app.activeTopics().filter((t) => t.subject === key);
+        return `<button class="subject-tile ${app.subjectFilter === key ? "selected" : ""}" data-action="subject" data-id="${key}">${app.subjectIcon(key)}<strong>${sub.name}</strong><span>${app.CURRICULUM.find((c) => c.id === key)?.code}</span><div class="progress"><i style="width:${app.fraction(st)}%"></i></div><small>${st.filter((t) => app.status(t.id) === "done").length}/${st.length} topics</small></button>`;
       },
     ).join(
       "",
@@ -114,7 +115,7 @@ export function register(app) {
     return `${app.header("The syllabus. As authored in your course pack.", "Every unit of the subjects you selected, organised without hiding the remaining ones.", "SELECTED SYLLABUS · ALL UNITS")}<div class="banner">${app.icon("info")}<div><strong>CIA 2 focus is a study filter, not a confirmed current exam boundary.</strong><p>The uploaded 2025–26 papers emphasize Units 4–5 for DE/OOP/DSA, Modules 4–5 for UHV and Units 3 & 5 for Discrete. Algebraic Structures (Unit 4) remains included because you previously shared it. Python includes all exercises. Full syllabus shows everything.</p></div></div><div class="toolbar">${app.SUBJECTS.map((sub) => `<button class="filter-chip ${sub.id === app.syllabusSubject ? "active" : ""}" data-action="syllabus-subject" data-id="${sub.id}">${sub.short}</button>`).join("")}</div><section class="card"><div class="between"><div><h2>${c.name}</h2><p class="small muted" style="margin-top:5px">${c.code} · syllabus PDF pages ${c.pdfPages.join(", ")} (printed ${c.printedPages.join(", ")})</p></div>${app.subjectIcon(c.id)}</div><p class="small muted" style="margin-top:15px">Extracted from your uploaded university syllabus. Line wrapping is normalised. Original wording/typos are retained here; study notes clarify “sunmonoid” as submonoid.</p></section><div class="stack" style="margin-top:18px">${c.units
       .map((u) => {
         const ts = app.TOPICS.filter(
-          (t) => t.subject === c.id && t.unit === u.number,
+          (t) => t.subject === (c.key ?? c.id) && t.unit === u.number,
         );
         return `<article class="card syllabus-unit"><div class="between"><span class="tag ${app.EXAM_UNITS[c.id].includes(u.number) ? "done" : "medium"}">${c.id === "py" ? "EXERCISE" : c.id === "uhv" ? "MODULE" : "UNIT"} ${u.number}${app.EXAM_UNITS[c.id].includes(u.number) ? " · FOCUS" : ""}</span><span class="small muted">${ts.filter((t) => app.status(t.id) === "done").length}/${ts.length} topic groups completed</span></div><p class="extracted-text">${app.esc(u.text)}</p><div class="session-topic-links">${ts.map((t) => `<button data-action="topic" data-id="${t.id}">${t.title} ${app.status(t.id) === "done" ? "✓" : ""}</button>`).join("")}</div></article>`;
       })

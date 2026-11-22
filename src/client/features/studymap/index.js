@@ -100,7 +100,7 @@ export function register(app) {
             ? app.getSubject(course.coverage.authoredSubjectId)
             : null;
           const subjectTopics = matchingAuthoredSubject
-            ? app.TOPICS.filter((t) => t.subject === matchingAuthoredSubject.id)
+            ? app.TOPICS.filter((t) => t.subject === (matchingAuthoredSubject.key ?? matchingAuthoredSubject.id))
             : [];
           const readCount = subjectTopics.filter((t) => app.s.materialRead?.[t.id]).length;
           const doneCount = subjectTopics.filter((t) => app.status(t.id) === "done").length;
@@ -140,7 +140,7 @@ export function register(app) {
               isCurated && matchingAuthoredSubject
                 ? `<div class="authored-course-content" style="margin-top:16px;border-top:1px solid var(--border-color,#333);padding-top:12px">
                     <div class="between" style="margin-bottom:10px">
-                      <span class="small"><strong>Authored Lesson Bundle:</strong> ${subjectTopics.length} topics across ${app.CURRICULUM.find((c) => c.id === matchingAuthoredSubject.id)?.units.length || 0} units</span>
+                      <span class="small"><strong>Authored Lesson Bundle:</strong> ${subjectTopics.length} topics across ${app.CURRICULUM.find((c) => c.id === (matchingAuthoredSubject.key ?? matchingAuthoredSubject.id))?.units.length || 0} units</span>
                       <span class="small muted">Read: ${readCount}/${subjectTopics.length} · Mastered: ${doneCount}/${subjectTopics.length}</span>
                     </div>
                     <div class="topics-summary-list" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:8px">

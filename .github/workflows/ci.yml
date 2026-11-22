@@ -1,16 +1,85 @@
 name: Verify Study Sprint
+
 on:
   push:
     branches: [main]
   pull_request:
+
 permissions:
   contents: read
+
 jobs:
   verify:
+    name: Checks, unit tests and production build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm run verify
+          cache: npm
+      # There are no runtime dependencies; the lockfile exists so `npm ci` is
+      # deterministic and any accidental dependency shows up as a lockfile diff.
+      - run: npm ci
+      - name: Syntax and asset checks
+        run: npm run check
+      - name: Unit tests
+        run: npm test
+      - name: Course pack seed is reproducible
+        run: node scripts/seed-packs.mjs --check
+      - name: Production build
+        run: npm run build
+      - name: No server secret in the build output
+        run: |
+          if grep -rIl -E 'sb_secret_[A-Za-z0-9_-]{8,}|SUPABASE_SERVICE_ROLE_KEY=.+|postgres(ql)?://[^ "]*:[^ "@]+@' dist; then
+            echo "A server secret or credential appears in dist/." >&2
+            exit 1
+          fi
+
+  database:
+    name: PostgreSQL migrations, ownership and concurrency
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Matches what Supabase runs; the migrations only need PostgreSQL 15+.
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: study
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d study"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Required, not optional: the suite fails rather than skipping, so a broken
+      # policy cannot merge by quietly disabling the job's real assertion.
+      STUDY_SPRINT_PG: supabase
+      STUDY_SPRINT_REQUIRE_PG: "1"
+      SUPABASE_DB_URL: postgresql://postgres:postgres@127.0.0.1:5432/study
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Migrations, seed and ownership suite
+        run: npm run test:pg
+
+  desktop-scan:
+    name: Static page scan without a backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: The app boots and renders as a guest with no configuration
+        run: node tests/smoke/render-smoke.mjs
